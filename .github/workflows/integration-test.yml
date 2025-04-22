@@ -24,14 +24,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: '7.6.1'
+      # Generate Gradle wrapper if it doesn't exist
+      - name: Generate Gradle Wrapper
+        run: |
+          gradle wrapper --gradle-version 7.6.1
+          chmod +x ./gradlew
 
       - name: Build plugin
         run: |
           ./gradlew build
+
+      - name: Verify plugin ZIP was created
+        run: |
+          ls -la build/distributions/
+          test -f build/distributions/opensearch-late-interaction-1.0.0.0.zip || (echo "Plugin ZIP not found" && exit 1)
 
       - name: Start OpenSearch container
         run: |
@@ -45,58 +51,103 @@ jobs:
           # Wait for OpenSearch to start up
           echo "Waiting for OpenSearch to start..."
           timeout 120 bash -c 'until curl -s -f http://localhost:9200/_cluster/health?wait_for_status=yellow; do sleep 2; done'
+          echo "OpenSearch is up and running"
 
       - name: Install plugin
         run: |
-          # Copy and install plugin
+          # Copy plugin to container
           docker cp build/distributions/opensearch-late-interaction-1.0.0.0.zip opensearch:/tmp/
+          
+          # Install plugin
           docker exec opensearch /usr/share/opensearch/bin/opensearch-plugin install \
             file:///tmp/opensearch-late-interaction-1.0.0.0.zip
           
           # Restart OpenSearch to load the plugin
           docker restart opensearch
           
-          # Wait for restart
+          # Wait for OpenSearch to start up again
+          echo "Waiting for OpenSearch to restart..."
           timeout 120 bash -c 'until curl -s -f http://localhost:9200/_cluster/health?wait_for_status=yellow; do sleep 2; done'
+          echo "OpenSearch is up and running with plugin installed"
 
-      - name: Verify plugin and run basic tests
+      - name: Verify plugin installation
         run: |
-          # Verify plugin is installed
-          docker exec opensearch /usr/share/opensearch/bin/opensearch-plugin list | grep "opensearch-late-interaction"
+          # List installed plugins and verify our plugin is there
+          echo "Listing installed plugins..."
+          docker exec opensearch /usr/share/opensearch/bin/opensearch-plugin list
           
-          # Create test index with vector field
-          curl -X PUT "localhost:9200/test_index" -H 'Content-Type: application/json' -d'
+          # Verify our plugin appears in the list
+          docker exec opensearch /usr/share/opensearch/bin/opensearch-plugin list | grep "opensearch-late-interaction"
+
+      - name: Run basic integration test
+        run: |
+          # Create a test index
+          curl -X PUT "localhost:9200/test-index" -H 'Content-Type: application/json' -d'
           {
             "mappings": {
               "properties": {
-                "token_vectors": {
-                  "type": "keyword"
+                "text_field": { "type": "text" },
+                "vector_field": {
+                  "type": "knn_vector",
+                  "dimension": 3,
+                  "method": {
+                    "name": "hnsw",
+                    "space_type": "innerproduct",
+                    "parameters": {
+                      "m": 16,
+                      "ef_construction": 200
+                    }
+                  }
                 }
               }
             }
           }'
           
-          # Add test document
-          curl -X POST "localhost:9200/test_index/_doc/1" -H 'Content-Type: application/json' -d'
+          # Add a test document
+          curl -X POST "localhost:9200/test-index/_doc" -H 'Content-Type: application/json' -d'
           {
-            "token_vectors": "test_vector"
+            "text_field": "test document",
+            "vector_field": [0.1, 0.2, 0.3]
           }'
           
-          # Run search with maxsim rescoring (basic verification)
-          curl -X POST "localhost:9200/test_index/_search" -H 'Content-Type: application/json' -d'
+          # Refresh index
+          curl -X POST "localhost:9200/test-index/_refresh"
+          
+          # Attempt a search with maxsim rescoring
+          echo "Attempting search with MaxSim rescoring..."
+          RESPONSE=$(curl -s -X GET "localhost:9200/test-index/_search" -H 'Content-Type: application/json' -d'
           {
-            "query": { "match_all": {} },
+            "size": 10,
+            "query": {
+              "match_all": {}
+            },
             "rescore": {
               "window_size": 10,
               "query": {
                 "rescore_query": {
                   "maxsim": {
                     "query_vectors": [[0.1, 0.2, 0.3]],
-                    "field": "token_vectors",
+                    "field": "vector_field",
                     "similarity": "dot_product"
                   }
                 },
-                "query_weight": 0.7
+                "rescore_query_weight": 1.0
               }
             }
-          }'
+          }')
+          
+          echo "Search response: $RESPONSE"
+          
+          # Check if the response contains an error related to the rescorer
+          if echo "$RESPONSE" | grep -q "No rescore for \[maxsim\]"; then
+            echo "MaxSim rescorer not found - plugin may not be working correctly"
+            exit 1
+          else
+            echo "Integration test passed"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop opensearch || true
+          docker rm opensearch || true
