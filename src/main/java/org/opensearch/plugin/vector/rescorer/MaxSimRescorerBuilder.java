@@ -5,21 +5,24 @@
 
 package org.opensearch.plugin.vector.rescorer;
 
-import org.opensearch.common.ParseField;
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.io.stream.StreamOutput;
-import org.opensearch.common.xcontent.ConstructingObjectParser;
-import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.core.ParseField;
+import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.core.common.io.stream.StreamOutput;
+import org.opensearch.xcontent.ConstructingObjectParser;
+import org.opensearch.xcontent.ObjectParser;
+import org.opensearch.xcontent.XContentBuilder;
+import org.opensearch.xcontent.XContentParser;
 import org.opensearch.search.rescore.RescorerBuilder;
+import org.opensearch.search.rescore.RescoreContext;
+import org.opensearch.search.SearchExecutionContext;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import static org.opensearch.common.xcontent.ConstructingObjectParser.constructorArg;
-import static org.opensearch.common.xcontent.ConstructingObjectParser.optionalConstructorArg;
+import static org.opensearch.xcontent.ConstructingObjectParser.constructorArg;
+import static org.opensearch.xcontent.ConstructingObjectParser.optionalConstructorArg;
 
 /**
  * Builder for the MaxSim rescorer which computes the maximum similarity
@@ -172,8 +175,37 @@ public class MaxSimRescorerBuilder extends RescorerBuilder<MaxSimRescorerBuilder
     }
 
     @Override
-    public MaxSimRescorer build(SearchExecutionContext context) {
-        return new MaxSimRescorer(queryVectors, field, similarity);
+    protected RescoreContext innerBuildContext(int windowSize, SearchExecutionContext context) {
+        return new MaxSimRescoreContext(windowSize, this, queryVectors, field, similarity);
+    }
+    
+    /**
+     * Custom RescoreContext implementation for MaxSimRescorer
+     */
+    public static class MaxSimRescoreContext extends RescoreContext {
+        private final List<List<Float>> queryVectors;
+        private final String field;
+        private final String similarity;
+        
+        public MaxSimRescoreContext(int windowSize, RescorerBuilder<?> rescorerBuilder, 
+                                 List<List<Float>> queryVectors, String field, String similarity) {
+            super(windowSize, rescorerBuilder);
+            this.queryVectors = queryVectors;
+            this.field = field;
+            this.similarity = similarity;
+        }
+        
+        public List<List<Float>> getQueryVectors() {
+            return queryVectors;
+        }
+        
+        public String getField() {
+            return field;
+        }
+        
+        public String getSimilarity() {
+            return similarity;
+        }
     }
 
     @Override

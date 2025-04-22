@@ -12,6 +12,8 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.opensearch.plugin.vector.util.VectorUtils;
 import org.opensearch.search.rescore.Rescorer;
+import org.opensearch.search.rescore.RescoreContext;
+import org.opensearch.plugin.vector.rescorer.MaxSimRescorerBuilder.MaxSimRescoreContext;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,25 +24,15 @@ import java.util.List;
  */
 public class MaxSimRescorer implements Rescorer {
 
-    private final List<List<Float>> queryVectors;
-    private final String field;
-    private final String similarity;
-
-    /**
-     * Creates a new MaxSim rescorer with the given parameters
-     *
-     * @param queryVectors The query token vectors
-     * @param field The field containing document token vectors
-     * @param similarity The similarity function to use (dot_product, cosine, etc.)
-     */
-    public MaxSimRescorer(List<List<Float>> queryVectors, String field, String similarity) {
-        this.queryVectors = queryVectors;
-        this.field = field;
-        this.similarity = similarity;
-    }
+    public static final Rescorer INSTANCE = new MaxSimRescorer();
 
     @Override
-    public TopDocs rescore(TopDocs topDocs, IndexSearcher searcher, RescoreContext rescoreContext) throws IOException {
+    public TopDocs rescore(TopDocs topDocs, IndexSearcher searcher, RescoreContext context) throws IOException {
+        MaxSimRescoreContext maxSimContext = (MaxSimRescoreContext) context;
+        List<List<Float>> queryVectors = maxSimContext.getQueryVectors();
+        String field = maxSimContext.getField();
+        String similarity = maxSimContext.getSimilarity();
+        
         // Make a copy of the scoreDocs array so we can modify the scores
         ScoreDoc[] scoreDocs = new ScoreDoc[topDocs.scoreDocs.length];
         for (int i = 0; i < topDocs.scoreDocs.length; i++) {
@@ -49,7 +41,7 @@ public class MaxSimRescorer implements Rescorer {
         }
         
         // Only rescore the top N documents based on window size
-        int windowSize = Math.min(rescoreContext.getWindowSize(), scoreDocs.length);
+        int windowSize = Math.min(context.getWindowSize(), scoreDocs.length);
 
         // Get LeafReaderContext for accessing document data
         List<LeafReaderContext> leaves = searcher.getIndexReader().leaves();
@@ -82,7 +74,7 @@ public class MaxSimRescorer implements Rescorer {
             float maxSimScore = VectorUtils.computeMaxSim(queryVectors, docVectors, similarity);
             
             // Combine with original score based on weight
-            float weight = rescoreContext.getQueryWeight();
+            float weight = context.getQueryWeight();
             float originalScore = scoreDoc.score;
             scoreDoc.score = (1 - weight) * originalScore + weight * maxSimScore;
         }
@@ -109,8 +101,13 @@ public class MaxSimRescorer implements Rescorer {
     }
 
     @Override
-    public Explanation explain(int docId, IndexSearcher searcher, RescoreContext rescoreContext,
+    public Explanation explain(int docId, IndexSearcher searcher, RescoreContext context,
                              Explanation sourceExplanation) throws IOException {
+        MaxSimRescoreContext maxSimContext = (MaxSimRescoreContext) context;
+        List<List<Float>> queryVectors = maxSimContext.getQueryVectors();
+        String field = maxSimContext.getField();
+        String similarity = maxSimContext.getSimilarity();
+        
         List<LeafReaderContext> leaves = searcher.getIndexReader().leaves();
         
         // Find the right segment for this document
@@ -135,7 +132,7 @@ public class MaxSimRescorer implements Rescorer {
         float maxSimScore = VectorUtils.computeMaxSim(queryVectors, docVectors, similarity);
         
         // Calculate final score with weight
-        float weight = rescoreContext.getQueryWeight();
+        float weight = context.getQueryWeight();
         float originalScore = sourceExplanation.getValue().floatValue();
         float finalScore = (1 - weight) * originalScore + weight * maxSimScore;
         

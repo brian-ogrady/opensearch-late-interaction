@@ -7,7 +7,7 @@ package org.opensearch.plugin.vector;
 
 import org.opensearch.plugins.Plugin;
 import org.opensearch.plugins.SearchPlugin;
-import org.opensearch.search.rescore.RescorerBuilder;
+import org.opensearch.search.rescore.RescorerSpec;
 import org.opensearch.plugin.vector.rescorer.MaxSimRescorerBuilder;
 
 import java.util.ArrayList;
@@ -21,9 +21,15 @@ import java.util.List;
 public class LateInteractionPlugin extends Plugin implements SearchPlugin {
 
     @Override
-    public List<RescorerBuilder<?>> getRescorers() {
-        List<RescorerBuilder<?>> rescorers = new ArrayList<>();
-        rescorers.add(new MaxSimRescorerBuilder());
+    public List<RescorerSpec<?>> getRescorers() {
+        List<RescorerSpec<?>> rescorers = new ArrayList<>();
+        
+        rescorers.add(RescorerSpec.of(
+            MaxSimRescorerBuilder.NAME,
+            (in) -> new MaxSimRescorerBuilder(in),
+            (parser) -> MaxSimRescorerBuilder.fromXContent(parser)
+        ));
+        
         return rescorers;
     }
 }
