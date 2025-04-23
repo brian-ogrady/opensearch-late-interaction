@@ -21,11 +21,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Generate Gradle wrapper if it doesn't exist
-      - name: Generate Gradle Wrapper
-        run: |
-          gradle wrapper --gradle-version 7.6.1
-          chmod +x ./gradlew
+      # Use Gradle wrapper
+      - name: Verify Gradle wrapper
+        run: chmod +x ./gradlew
 
       - name: Run unit tests
         run: ./gradlew test
@@ -36,9 +34,3 @@ jobs:
         with:
           name: test-reports
           path: build/reports/tests/
-      
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v3
-        if: always() # always run even if the previous step fails
-        with:
-          report_paths: '**/build/test-results/test/TEST-*.xml'

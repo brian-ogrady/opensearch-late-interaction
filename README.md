@@ -48,17 +48,27 @@ This approach balances efficiency with the precision benefits of late interactio
 - Security and stability improvements
 - Advanced configuration options
 
-## Installation
+## Building and Installation
+
+### Initial Setup
+
+1. Set up the Gradle wrapper (if not already present):
+   ```bash
+   gradle wrapper --gradle-version 7.6.1
+   chmod +x ./gradlew
+   ```
 
 ### Local Installation
 
-```bash
-# Build the plugin
-./gradlew build
+1. Build the plugin:
+   ```bash
+   ./gradlew build
+   ```
 
-# Install the plugin in OpenSearch
-bin/opensearch-plugin install file:///path/to/opensearch-late-interaction-1.0.0.0.zip
-```
+2. Install the plugin in OpenSearch:
+   ```bash
+   bin/opensearch-plugin install file:///path/to/opensearch-late-interaction-1.0.0.0.zip
+   ```
 
 ### AWS OpenSearch Service Installation
 
@@ -82,7 +92,13 @@ bin/opensearch-plugin install file:///path/to/opensearch-late-interaction-1.0.0.
    ```
 
 4. Associate the plugin with your OpenSearch domain through the AWS console or CLI.
-```
+
+### Automated Testing with GitHub Actions
+
+This repository includes two GitHub Actions workflows:
+
+1. **Unit Tests**: Automatically runs unit tests when changes are pushed
+2. **Integration Tests**: Tests the plugin with actual OpenSearch instances (2.15.0 and 2.17.0)
 
 ## Usage Examples
 

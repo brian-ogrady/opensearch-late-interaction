@@ -74,7 +74,10 @@ public class MaxSimRescorer implements Rescorer {
             float maxSimScore = VectorUtils.computeMaxSim(queryVectors, docVectors, similarity);
             
             // Combine with original score based on weight
-            float weight = context.getQueryWeight();
+            float weight = 1.0f; // Default weight
+            if (context instanceof MaxSimRescorerBuilder.MaxSimRescoreContext) {
+                weight = ((MaxSimRescorerBuilder.MaxSimRescoreContext) context).getQueryWeight();
+            }
             float originalScore = scoreDoc.score;
             scoreDoc.score = (1 - weight) * originalScore + weight * maxSimScore;
         }
@@ -132,7 +135,10 @@ public class MaxSimRescorer implements Rescorer {
         float maxSimScore = VectorUtils.computeMaxSim(queryVectors, docVectors, similarity);
         
         // Calculate final score with weight
-        float weight = context.getQueryWeight();
+        float weight = 1.0f; // Default weight
+        if (context instanceof MaxSimRescorerBuilder.MaxSimRescoreContext) {
+            weight = ((MaxSimRescorerBuilder.MaxSimRescoreContext) context).getQueryWeight();
+        }
         float originalScore = sourceExplanation.getValue().floatValue();
         float finalScore = (1 - weight) * originalScore + weight * maxSimScore;
         

@@ -20,11 +20,14 @@
 #### MaxSimRescorerBuilder.java Changes
 - Added the required `innerBuildContext()` method to replace the previous `build()` method
 - Created a new inner class `MaxSimRescoreContext` that extends `RescoreContext` to hold the query state
+- Updated method signature to use `QueryShardContext` instead of `SearchExecutionContext`
+- Added `getQueryWeight()` method to `MaxSimRescoreContext` to support rescoring weight configuration
 
 #### MaxSimRescorer.java Changes
 - Refactored to use a singleton pattern with `INSTANCE` static field
 - Removed instance fields and constructor in favor of retrieving parameters from the context
 - Updated `rescore()` and `explain()` methods to use the new `MaxSimRescoreContext`
+- Modified weight handling to check if the context is an instance of `MaxSimRescoreContext` before retrieving the weight
 
 ### 3. Integration Testing
 - Added GitHub Actions workflow for automated testing with OpenSearch 2.15.0 and 2.17.0

@@ -14,7 +14,7 @@ import org.opensearch.xcontent.XContentBuilder;
 import org.opensearch.xcontent.XContentParser;
 import org.opensearch.search.rescore.RescorerBuilder;
 import org.opensearch.search.rescore.RescoreContext;
-import org.opensearch.search.SearchExecutionContext;
+import org.opensearch.index.query.QueryShardContext;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -175,7 +175,7 @@ public class MaxSimRescorerBuilder extends RescorerBuilder<MaxSimRescorerBuilder
     }
 
     @Override
-    protected RescoreContext innerBuildContext(int windowSize, SearchExecutionContext context) {
+    protected RescoreContext innerBuildContext(int windowSize, QueryShardContext context) {
         return new MaxSimRescoreContext(windowSize, this, queryVectors, field, similarity);
     }
     
@@ -205,6 +205,10 @@ public class MaxSimRescorerBuilder extends RescorerBuilder<MaxSimRescorerBuilder
         
         public String getSimilarity() {
             return similarity;
+        }
+        
+        public float getQueryWeight() {
+            return 1.0f; // Default weight, can be made configurable if needed
         }
     }
 

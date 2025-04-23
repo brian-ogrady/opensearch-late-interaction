@@ -18,13 +18,13 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
-import org.opensearch.common.io.stream.BytesStreamOutput;
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.common.xcontent.XContentFactory;
-import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.common.xcontent.XContentType;
-import org.opensearch.search.rescore.RescorerBuilder;
+import org.opensearch.core.common.io.stream.BytesStreamOutput;
+import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.xcontent.XContentBuilder;
+import org.opensearch.xcontent.XContentFactory;
+import org.opensearch.xcontent.XContentParser;
+import org.opensearch.xcontent.XContentType;
+import org.opensearch.search.rescore.RescoreContext;
 import org.opensearch.test.OpenSearchTestCase;
 
 import java.io.IOException;
@@ -120,11 +120,12 @@ public class MaxSimRescorerTests extends OpenSearchTestCase {
             
             // Create rescorer
             List<List<Float>> queryVectors = createQueryVectors();
-            MaxSimRescorer rescorer = new MaxSimRescorer(queryVectors, "token_vectors", "dot_product");
             
-            // Rescore with window of 3
-            RescorerBuilder.RescoreContext context = new RescorerBuilder.RescoreContext(3, 1.0f);
-            TopDocs rescored = rescorer.rescore(topDocs, searcher, context);
+            // Create a rescore context with the MaxSimRescoreContext
+            MaxSimRescorerBuilder builder = new MaxSimRescorerBuilder(queryVectors, "token_vectors", "dot_product");
+            MaxSimRescorerBuilder.MaxSimRescoreContext context = 
+                (MaxSimRescorerBuilder.MaxSimRescoreContext) builder.innerBuildContext(3, null);
+            TopDocs rescored = MaxSimRescorer.INSTANCE.rescore(topDocs, searcher, context);
             
             // Verify results still have 5 documents
             assertEquals(5, rescored.scoreDocs.length);
